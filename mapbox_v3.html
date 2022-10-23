@@ -38,6 +38,10 @@
             left: 10px;
             padding: 10px;
         }
+
+        .popup {
+            z-index: 1000;
+        }
     </style>
 
     <div id="map"></div>
@@ -57,10 +61,15 @@
         const overlay = document.getElementById('map-overlay');
         const mainData = [];
 
-        // Create a popup, but don't add it to the map yet.
         const popup = new mapboxgl.Popup({
-            closeButton: false
+            closeButton: false,
+            className: "popup"
         });
+        const tooltip = new mapboxgl.Popup({
+            closeButton: false,
+
+        });
+
 
 
 
@@ -124,31 +133,9 @@
             );
 
             map.on('click', 'counties', (e) => {
-                showPopup(e)
-            })
-
-
-            map.on('mousemove', 'counties', (e) => {
-                showPopup(e)
-            });
-
-            map.on('mouseleave', 'counties', () => {
-                map.getCanvas().style.cursor = '';
-                // popup.remove();
-                // map.setFilter('counties-highlighted', ['in', 'COUNTY', '']);
-                // overlay.style.display = 'none';
-            });
-
-            function showPopup(e) {
-                // Change the cursor style as a UI indicator.
                 map.getCanvas().style.cursor = 'pointer';
                 const feature = e.features[0];
                 var center = turf.centerOfMass(feature);
-                // popup
-                //     .setLngLat(center.geometry.coordinates)
-                //     .setText(feature.properties.COUNTY)
-                //     .addTo(map);
-
                 const county = mainData.find(county => county.ID === String(feature.properties.FIPS))
                 let data = "No data";
                 if (county) {
@@ -167,8 +154,27 @@
                 else {
                     overlay.innerHTML = "No data"
                 }
+            })
 
-            }
+            map.on('mousemove', 'counties', (e) => {
+                map.getCanvas().style.cursor = 'pointer';
+                const feature = e.features[0];
+                const county = mainData.find(county => county.ID === String(feature.properties.FIPS))
+                tooltip
+                    .setLngLat(e.lngLat)
+                    .setHTML(feature.properties.COUNTY)
+                    .addTo(map);
+            });
+
+            map.on('mouseleave', 'counties', () => {
+                map.getCanvas().style.cursor = '';
+                tooltip.remove();
+
+                // map.setFilter('counties-highlighted', ['in', 'COUNTY', '']);
+                // overlay.style.display = 'none';
+            });
+
+
         });
     </script>
 
