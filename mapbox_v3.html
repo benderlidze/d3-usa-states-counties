@@ -8,6 +8,8 @@
     <link href="https://api.mapbox.com/mapbox-gl-js/v2.10.0/mapbox-gl.css" rel="stylesheet">
     <script src="https://api.mapbox.com/mapbox-gl-js/v2.10.0/mapbox-gl.js"></script>
     <script src="https://d3js.org/d3.v7.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@turf/turf@6/turf.min.js"></script>
+
     <style>
         body {
             margin: 0;
@@ -60,21 +62,33 @@
             closeButton: false
         });
 
-        d3.csv("https://docs.google.com/spreadsheets/d/e/2PACX-1vQdBt78mIWMd2Pv5ka7frPnJgWXUkvnvQ9u9zURUQr_3a5hHtXmPc-arC9mGLPLJFt8XO8ug2-mthd2/pub?output=csv")
-            .then(data => {
-                console.log('data', data);
-                mainData.push(...data)
 
-
-            })
 
         map.on('load', () => {
 
-            
+            Promise.all([
+                d3.csv("https://docs.google.com/spreadsheets/d/e/2PACX-1vQdBt78mIWMd2Pv5ka7frPnJgWXUkvnvQ9u9zURUQr_3a5hHtXmPc-arC9mGLPLJFt8XO8ug2-mthd2/pub?output=csv"),
+                fetch("counties.json").then(data => data.json())
+            ]).then(allData => {
+                const [data, geojson] = allData
+                mainData.push(...data)
+
+                geojson.features.forEach(d => {
+                    const county = mainData.find(county => county.ID === d.properties.FIPS)
+                    if (county && county.Status) {
+                        d.properties.color = county.Status.toLowerCase() === 'claimed' ? 'red' : 'green'
+                    } else {
+                        d.properties.color = 'lightgray'
+                    }
+                })
+
+                console.log('geojson', geojson);
+                map.getSource("counties").setData(geojson)
+            })
 
             map.addSource('counties', {
-                'type': 'vector',
-                'url': 'mapbox://mapbox.82pkq93d'
+                'type': 'geojson',
+                'data': { type: 'FeatureCollection', features: [] }
             });
             // Add transparent county polygons
             // for default display.
@@ -82,10 +96,9 @@
                 'id': 'counties',
                 'type': 'fill',
                 'source': 'counties',
-                'source-layer': 'original',
                 'paint': {
-                    'fill-outline-color': 'rgba(0,0,0,0.1)',
-                    'fill-color': 'rgba(0,0,0,0.1)'
+                    'fill-outline-color': 'rgba(255,255,255,0.5)',
+                    'fill-color': ['get', 'color']
                 }
             },
                 'settlement-label'
@@ -97,7 +110,6 @@
                 'id': 'counties-highlighted',
                 'type': 'fill',
                 'source': 'counties',
-                'source-layer': 'original',
                 'paint': {
                     'fill-outline-color': '#484896',
                     'fill-color': '#6e599f',
@@ -112,58 +124,51 @@
             );
 
             map.on('click', 'counties', (e) => {
-                console.log('e', e);
-                const feature = e.features[0];
-                const relatedCounties = map.querySourceFeatures('counties', {
-                    sourceLayer: 'original',
-                    filter: ['in', 'COUNTY', feature.properties.COUNTY]
-                });
+                showPopup(e)
+            })
 
-                console.log('relatedCounties', relatedCounties.features);
-                console.log('ID', feature.properties.FIPS);
+
+            map.on('mousemove', 'counties', (e) => {
+                showPopup(e)
+            });
+
+            map.on('mouseleave', 'counties', () => {
+                map.getCanvas().style.cursor = '';
+                // popup.remove();
+                // map.setFilter('counties-highlighted', ['in', 'COUNTY', '']);
+                // overlay.style.display = 'none';
+            });
+
+            function showPopup(e) {
+                // Change the cursor style as a UI indicator.
+                map.getCanvas().style.cursor = 'pointer';
+                const feature = e.features[0];
+                var center = turf.centerOfMass(feature);
+                // popup
+                //     .setLngLat(center.geometry.coordinates)
+                //     .setText(feature.properties.COUNTY)
+                //     .addTo(map);
 
                 const county = mainData.find(county => county.ID === String(feature.properties.FIPS))
+                let data = "No data";
                 if (county) {
-                    const data = `<div>
+                    data = `<div>
                             <div>State:${county.State}</div>
                             <div>County:${county.County}</div>
                             <div>Reach:${county.Reach}</div>
                             <div>${county.URL}</div>
                         </div>`
-
                     overlay.innerHTML = data
+                    popup
+                        .setLngLat(center.geometry.coordinates)
+                        .setHTML(data)
+                        .addTo(map);
                 }
                 else {
                     overlay.innerHTML = "No data"
                 }
-                popup
-                    .setLngLat(e.lngLat)
-                    .setText(feature.properties.COUNTY)
-                    .addTo(map);
-            })
 
-            map.on('mousemove', 'counties', (e) => {
-                // Change the cursor style as a UI indicator.
-                map.getCanvas().style.cursor = 'pointer';
-                const feature = e.features[0];
-                map.setFilter('counties-highlighted', [
-                    'in',
-                    'FIPS',
-                    feature.properties.FIPS
-                ]);
-                // Display a popup with the name of the county.
-                popup
-                    .setLngLat(e.lngLat)
-                    .setText(feature.properties.COUNTY)
-                    .addTo(map);
-            });
-
-            map.on('mouseleave', 'counties', () => {
-                map.getCanvas().style.cursor = '';
-                popup.remove();
-                map.setFilter('counties-highlighted', ['in', 'COUNTY', '']);
-                // overlay.style.display = 'none';
-            });
+            }
         });
     </script>
 
