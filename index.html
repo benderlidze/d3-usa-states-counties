@@ -57,12 +57,14 @@
 <body>
     <div id="info"></div>
     <div class="viz"></div>
+    <div id="more"></div>
     <script type="text/javascript" src="https://cdnjs.cloudflare.com/ajax/libs/d3/5.7.0/d3.min.js"></script>
     <script type="text/javascript" src="https://d3js.org/topojson.v3.min.js"></script>
     <script type="text/javascript">
 
 
         const infoDiv = document.getElementById("info")
+        const more = document.getElementById("more")
         const mainData = [];
 
         var margin = {
@@ -92,7 +94,6 @@
                 console.log('data', data);
                 mainData.push(...data)
             })
-
 
         Promise.resolve(d3.json('usa.json'))
             .then(ready);
@@ -146,6 +147,7 @@
                             <div>${county.URL}</div>
                         </div>`
                         tooltip.html(data);
+                        more.innerHTML = data
                     } else {
                         tooltip.text("No Data.");
                     }
