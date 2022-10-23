@@ -43,6 +43,14 @@
             top: 20px;
             left: 20px;
         }
+
+        .tooltip {
+            position: absolute;
+            pointer-events: none;
+            padding: 10px;
+            border-radius: 10px;
+            ;
+        }
     </style>
 </head>
 
@@ -55,6 +63,8 @@
 
 
         const infoDiv = document.getElementById("info")
+        const mainData = [];
+
         var margin = {
             top: 10,
             bottom: 10,
@@ -77,6 +87,12 @@
             .attr('width', width + margin.left + margin.right)
             .on('click', clicked);
 
+        d3.csv("https://docs.google.com/spreadsheets/d/e/2PACX-1vQdBt78mIWMd2Pv5ka7frPnJgWXUkvnvQ9u9zURUQr_3a5hHtXmPc-arC9mGLPLJFt8XO8ug2-mthd2/pub?output=csv")
+            .then(data => {
+                console.log('data', data);
+                mainData.push(...data)
+            })
+
 
         Promise.resolve(d3.json('usa.json'))
             .then(ready);
@@ -94,6 +110,15 @@
             .attr('width', width + margin.left + margin.right)
             .attr('height', height + margin.top + margin.bottom)
 
+        var tooltip = d3.select("body")
+            .append("div")
+            .attr("class", "tooltip")
+            .style("position", "absolute")
+            .style("z-index", "10")
+            .style("visibility", "hidden")
+            .style("background", "white")
+
+
         function ready(us) {
 
 
@@ -106,7 +131,28 @@
                 .enter().append("path")
                 .attr("d", path)
                 .attr("class", "county-boundary")
-                .on("click", reset);
+                .on("click", reset)
+                .on("mouseover", function (d) {
+
+                    console.log('d', d.properties.name);
+                    //const county = mainData.find(county => county.County.toLowerCase() === d.properties.name.toLowerCase())
+                    const county = mainData.find(county => county.ID === d.id)
+                    if (county) {
+                        console.log('county', county);
+                        const data = `<div>
+                            <div>State:${county.State}</div>
+                            <div>County:${county.County}</div>
+                            <div>Reach:${county.Reach}</div>
+                            <div>${county.URL}</div>
+                        </div>`
+                        tooltip.html(data);
+                    } else {
+                        tooltip.text("No Data.");
+                    }
+                    return tooltip.style("visibility", "visible");
+                })
+                .on("mousemove", function () { return tooltip.style("top", (d3.event.pageY - 10) + "px").style("left", (d3.event.pageX + 10) + "px"); })
+                .on("mouseout", function () { return tooltip.style("visibility", "hidden"); });
 
             g.append("g")
                 .attr("id", "states")
@@ -133,7 +179,10 @@
 
         function clicked(d) {
 
-            if (!d) return;
+            if (!d) {
+                reset()
+                return;
+            }
 
             const node = d3.select("#id-" + d.id)
             if (d3.select('.background').node() === this) return reset();
@@ -155,8 +204,7 @@
                 .attr("transform", "translate(" + translate + ")scale(" + scale + ")");
         }
 
-        function reset(d) {
-            console.log('reset', d);
+        function reset() {
             active.classed("active", false);
             active = d3.select(null);
             g.transition()
