@@ -119,15 +119,19 @@
                 console.log('ID', feature.properties.FIPS);
 
                 const county = mainData.find(county => county.ID === String(feature.properties.FIPS))
-                const data = `<div>
+                if (county) {
+                    const data = `<div>
                             <div>State:${county.State}</div>
                             <div>County:${county.County}</div>
                             <div>Reach:${county.Reach}</div>
                             <div>${county.URL}</div>
                         </div>`
 
-                overlay.innerHTML = data
-
+                    overlay.innerHTML = data
+                }
+                else{
+                    overlay.innerHTML = "No data"
+                }
                 popup
                     .setLngLat(e.lngLat)
                     .setText(feature.properties.COUNTY)
