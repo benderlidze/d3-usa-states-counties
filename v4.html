@@ -16,7 +16,7 @@
 	Initialize the Store Builder Library
 -->
   <script id="fsc-api" src="https://d1f8f9xcsvx3ha.cloudfront.net/sbl/0.9.0/fastspring-builder.min.js"
-    type="text/javascript" data-storefront="mdcllc.test.onfastspring.com/popup-defaultB2B">
+    type="text/javascript" data-storefront="gurus.test.onfastspring.com/popup-gurus">
     </script>
 
 
@@ -66,9 +66,14 @@
     }
   </style>
 
+
   <div id="map"></div>
-  <div id="map-overlay" class="map-overlay"></div>
+  <div id="map-overlay" class="map-overlay">
+    <button data-fsc-item-path="my-path" data-fsc-action="Add" data-fsc-silent="true">Add</button>
+  </div>
   <div id="infoDiv"></div>
+
+
 
   <script>
     mapboxgl.accessToken = 'pk.eyJ1Ijoic2VyZ2JlciIsImEiOiJja3dwOWgzeGQwYWdyMm9xb2pkMDFvYmNuIn0.H9AJ_NLmDNYMed6dvu_Q0A';
@@ -114,13 +119,14 @@
       Promise.all([
         d3.csv("https://docs.google.com/spreadsheets/d/e/2PACX-1vQdBt78mIWMd2Pv5ka7frPnJgWXUkvnvQ9u9zURUQr_3a5hHtXmPc-arC9mGLPLJFt8XO8ug2-mthd2/pub?output=csv"),
         fetch("https://map0182367556u.s3.us-east-1.amazonaws.com/02/counties.json").then(data => data.json()),
-        fetch("https://map0182367556u.s3.amazonaws.com/02/states.geojson").then(data => data.json()),
+        fetch("https://map0182367556u.s3.amazonaws.com/02/states.geojson").then(data => data.json()), // for dropdown => move map to the selected state
         // (im not sure what this map file is for?? -> fetch("https://map0182367556u.s3.amazonaws.com/02/usa.json").then(data => data.json()),
         // (im not sure what this map file is for?? ->  fetch("https://map0182367556u.s3.amazonaws.com/02/us.json").then(data => data.json()),
       ]).then(allData => {
         const [data, geojson, states] = allData
         mainData.push(...data)
 
+        console.log(data)
         geojson.features.forEach(d => {
           const county = mainData.find(county => county.ID === d.properties.FIPS)
           if (county && county.Status) {
@@ -193,8 +199,7 @@
                             <div>${county.County} County</div>
                             <div>Reach:${county.Reach}</div>
                             <div>${county.URL}</div>
-
-                            <button data-fsc-action="ViewCart"> View Cart</button>
+                            <button data-fsc-action="ViewCart" class="fsc"> View Cart</button>
                         </div>`
           overlay.innerHTML = data
           popup
@@ -225,6 +230,14 @@
       });
     });
 
+    document.addEventListener("click", e => {
+      console.log(e.target);
+      const target = e.target
+      if (target.classList.contains('fsc')) {
+        const action = target.dataset.fscAction
+        fastspring.builder.viewCart()
+      }
+    })
 
     function fillDropDown(data, action) {
 
