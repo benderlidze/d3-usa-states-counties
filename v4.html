@@ -1,0 +1,259 @@
+<!DOCTYPE html>
+<html>
+
+<head>
+  <meta charset="utf-8">
+  <title>Highlight features containing similar data</title>
+  <meta name="viewport" content="initial-scale=1,maximum-scale=1,user-scalable=no">
+  <link href="https://api.mapbox.com/mapbox-gl-js/v2.10.0/mapbox-gl.css" rel="stylesheet">
+  <script src="https://api.mapbox.com/mapbox-gl-js/v2.10.0/mapbox-gl.js"></script>
+  <script src="https://d3js.org/d3.v7.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/@turf/turf@6/turf.min.js"></script>
+
+
+
+  <!--
+	Initialize the Store Builder Library
+-->
+  <script id="fsc-api" src="https://d1f8f9xcsvx3ha.cloudfront.net/sbl/0.9.0/fastspring-builder.min.js"
+    type="text/javascript" data-storefront="mdcllc.test.onfastspring.com/popup-defaultB2B">
+    </script>
+
+
+</head>
+
+<body>
+  <style>
+    body {
+      margin: 0;
+      padding: 0;
+    }
+
+    #map {
+      position: absolute;
+      top: 0;
+      bottom: 0;
+      width: 100%;
+    }
+
+    .map-overlay {
+      font: 12px/20px 'Helvetica Neue', Arial, Helvetica, sans-serif;
+      background-color: #fff;
+      box-shadow: 0 1px 2px rgba(0, 0, 0, 0.1);
+      border-radius: 3px;
+      position: absolute;
+      width: 25%;
+      top: 60px;
+      left: 10px;
+      padding: 10px;
+      display: none;
+    }
+
+    .popup {
+      z-index: 1000;
+    }
+
+    #infoDiv {
+      font: 12px/20px 'Helvetica Neue', Arial, Helvetica, sans-serif;
+      background-color: #fff;
+      box-shadow: 0 1px 2px rgba(0, 0, 0, 0.1);
+      border-radius: 3px;
+      position: absolute;
+      width: fit-content;
+      top: 10px;
+      left: 10px;
+      padding: 10px;
+    }
+  </style>
+
+  <div id="map"></div>
+  <div id="map-overlay" class="map-overlay"></div>
+  <div id="infoDiv"></div>
+
+  <script>
+    mapboxgl.accessToken = 'pk.eyJ1Ijoic2VyZ2JlciIsImEiOiJja3dwOWgzeGQwYWdyMm9xb2pkMDFvYmNuIn0.H9AJ_NLmDNYMed6dvu_Q0A';
+    const map = new mapboxgl.Map({
+      container: 'map',
+      // Choose from Mapbox's core styles, or make your own style with Mapbox Studio
+      style: 'mapbox://styles/mapbox/light-v10',
+      center: [-98, 38.88],
+      minZoom: 2,
+      zoom: 3
+    });
+
+    map.fitBounds([-127.65065108208405, 3.9566559422552388, -64.33105850577985, 61.822777458439816])
+
+    const overlay = document.getElementById('map-overlay');
+    const mainData = [];
+
+    const popup = new mapboxgl.Popup({
+      closeButton: false,
+      className: "popup"
+    });
+    const tooltip = new mapboxgl.Popup({
+      closeButton: false,
+
+    });
+
+
+    map.on('load', () => {
+
+      // ~~~~~~ MAP DATA ~~~~~~
+      // spreadsheet: https://docs.google.com/spreadsheets/d/e/2PACX-1vQdBt78mIWMd2Pv5ka7frPnJgWXUkvnvQ9u9zURUQr_3a5hHtXmPc-arC9mGLPLJFt8XO8ug2-mthd2/pub?output=csv
+      // counties:    https://map0182367556u.s3.us-east-1.amazonaws.com/02/counties.json
+      // states:      https://map0182367556u.s3.amazonaws.com/02/states.geojson
+      // us:          https://map0182367556u.s3.amazonaws.com/02/us.json 
+      // usa:         https://map0182367556u.s3.amazonaws.com/02/usa.json
+
+      // ~~~~~~ CHECKOUT ~~~~~~
+      // FastSpring Secure Cart Documentation: https://developer.fastspring.com/docs/methods#add-product
+      // USE EXAMPLE PRODUCT CODE: Windham County, CT
+      // https://docs.google.com/spreadsheets/d/1-Uj-q6LT_ZHyKubH5yom3NMG18q--JtaQFEreARho0g/edit#gid=0&fvid=550882924
+
+
+      Promise.all([
+        d3.csv("https://docs.google.com/spreadsheets/d/e/2PACX-1vQdBt78mIWMd2Pv5ka7frPnJgWXUkvnvQ9u9zURUQr_3a5hHtXmPc-arC9mGLPLJFt8XO8ug2-mthd2/pub?output=csv"),
+        fetch("https://map0182367556u.s3.us-east-1.amazonaws.com/02/counties.json").then(data => data.json()),
+        fetch("https://map0182367556u.s3.amazonaws.com/02/states.geojson").then(data => data.json()),
+        // (im not sure what this map file is for?? -> fetch("https://map0182367556u.s3.amazonaws.com/02/usa.json").then(data => data.json()),
+        // (im not sure what this map file is for?? ->  fetch("https://map0182367556u.s3.amazonaws.com/02/us.json").then(data => data.json()),
+      ]).then(allData => {
+        const [data, geojson, states] = allData
+        mainData.push(...data)
+
+        geojson.features.forEach(d => {
+          const county = mainData.find(county => county.ID === d.properties.FIPS)
+          if (county && county.Status) {
+            d.properties.color = county.Status.toLowerCase() === 'claimed' ? 'red' : 'green'
+          } else {
+            d.properties.color = 'lightgray'
+          }
+        })
+        map.getSource("counties").setData(geojson)
+
+        fillDropDown(states, id => {
+          console.log('states', states, id);
+          const state = states.features.find(s => s.properties.STATE === id)
+          console.log('state', state);
+          if (state) {
+            const bbox = turf.bbox(state)
+            map.fitBounds(bbox, { padding: 40 })
+          }
+        })
+
+      })
+
+      map.addSource('counties', {
+        'type': 'geojson',
+        'data': { type: 'FeatureCollection', features: [] }
+      });
+      // Add transparent county polygons
+      // for default display.
+      map.addLayer({
+        'id': 'counties',
+        'type': 'fill',
+        'source': 'counties',
+        'paint': {
+          'fill-outline-color': 'rgba(255,255,255,0.5)',
+          'fill-color': ['get', 'color'],
+          'fill-opacity': 0.5
+        }
+      },
+        'settlement-label'
+      );
+
+      // Add filled county polygons
+      // for highlighted display.
+      map.addLayer({
+        'id': 'counties-highlighted',
+        'type': 'fill',
+        'source': 'counties',
+        'paint': {
+          'fill-outline-color': '#484896',
+          'fill-color': '#6e599f',
+          'fill-opacity': 0.75
+        },
+        // Display none by adding a
+        // filter with an empty string.
+        'filter': ['in', 'COUNTY', '']
+      },
+        // Place polygons under labels.
+        'settlement-label'
+      );
+
+      map.on('click', 'counties', (e) => {
+        map.getCanvas().style.cursor = 'pointer';
+        const feature = e.features[0];
+        var center = turf.centerOfMass(feature);
+        const county = mainData.find(county => county.ID === String(feature.properties.FIPS))
+        let data = "No data";
+        if (county) {
+          data = `<div>
+                           
+                            <div>${county.County} County</div>
+                            <div>Reach:${county.Reach}</div>
+                            <div>${county.URL}</div>
+
+                            <button data-fsc-action="ViewCart"> View Cart</button>
+                        </div>`
+          overlay.innerHTML = data
+          popup
+            .setLngLat(center.geometry.coordinates)
+            .setHTML(data)
+            .addTo(map);
+        }
+        else {
+          overlay.innerHTML = "No data"
+        }
+      })
+
+      map.on('mousemove', 'counties', (e) => {
+        map.getCanvas().style.cursor = 'pointer';
+        const feature = e.features[0];
+        const county = mainData.find(county => county.ID === String(feature.properties.FIPS))
+        tooltip
+          .setLngLat(e.lngLat)
+          .setHTML(feature.properties.COUNTY)
+          .addTo(map);
+      });
+
+      map.on('mouseleave', 'counties', () => {
+        map.getCanvas().style.cursor = '';
+        tooltip.remove();
+        // map.setFilter('counties-highlighted', ['in', 'COUNTY', '']);
+        // overlay.style.display = 'none';
+      });
+    });
+
+
+    function fillDropDown(data, action) {
+
+      const selectList = document.createElement("select");
+      selectList.id = "mySelect";
+      infoDiv.appendChild(selectList)
+      selectList.addEventListener("change", d => {
+        const id = selectList.value
+        if (typeof action === "function") {
+          action(id)
+        }
+      })
+      data.features
+        .map(p => {
+          const name = p.properties.NAME
+          const id = p.properties.STATE
+          return { name, id }
+        })
+        .sort((a, b) => a.name.localeCompare(b.name))
+        .map(p => {
+          const option = document.createElement("option");
+          option.value = p.id;
+          option.text = p.name;
+          selectList.appendChild(option);
+        })
+
+    }
+  </script>
+
+</body>
+
+</html>
