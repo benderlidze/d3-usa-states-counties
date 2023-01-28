@@ -9,9 +9,7 @@
     <script src="https://api.mapbox.com/mapbox-gl-js/v2.10.0/mapbox-gl.js"></script>
     <script src="https://d3js.org/d3.v7.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/@turf/turf@6/turf.min.js"></script>
-
-    <script src="https://js.chargebee.com/v2/chargebee.js" data-cb-site="acme-test" data-cb-business-entity-id="__dev__XpbBuzpT02K2kd24"></script>
-
+    <script src="https://js.chargebee.com/v2/chargebee.js" data-cb-site="mdc2-test"></script>
 </head>
 
 <body>
@@ -28,14 +26,15 @@
             width: 100%;
         }
 
-        .map-overlay {
+        .map-overlay,
+        .sub {
             font: 12px/20px 'Helvetica Neue', Arial, Helvetica, sans-serif;
             background-color: #fff;
             box-shadow: 0 1px 2px rgba(0, 0, 0, 0.1);
             border-radius: 3px;
             position: absolute;
             width: 25%;
-            top: 60px;
+            top: 90px;
             left: 10px;
             padding: 10px;
         }
@@ -46,8 +45,8 @@
 
         #infoDiv {
             font: 12px/20px 'Helvetica Neue', Arial, Helvetica, sans-serif;
-            background-color: #fff;
-            box-shadow: 0 1px 2px rgba(0, 0, 0, 0.1);
+            background-color: rgb(221, 232, 221);
+            box-shadow: 0 1px 2px rgba(186, 225, 215, 0.1);
             border-radius: 3px;
             position: absolute;
             width: fit-content;
@@ -55,20 +54,44 @@
             left: 10px;
             padding: 10px;
         }
+
+        .sub {
+            margin-top: 15px;
+            background-color: rgb(178, 228, 178);
+            margin-bottom: 15px;
+            padding-right: 4px;
+            padding-left: 4px;
+            padding-top: 1px;
+            padding-bottom: 3px;
+            font: 12px/20px 'Helvetica Neue', Arial, Helvetica, sans-serif;
+            width: 65%;
+            border-color: lightgrey;
+            border-radius: 1px;
+            box-shadow: 0 0 1px 0 lightslategrey;
+            font-weight: 800;
+        }
+
+        .sub a {
+            font: 12px/20px 'Helvetica Neue', Arial, Helvetica, sans-serif;
+            color: #222;
+        }
+
+        .sub a:hover {
+            color: black;
+        }
+
+        h3 {
+            margin: 5px;
+            padding: 0;
+        }
     </style>
 
     <div id="map"></div>
     <div id="map-overlay" class="map-overlay"></div>
     <div id="infoDiv">
-
-        <h3>Checkout Drop-in</h3>
-        <a href="javascript:void(0)" data-cb-layout="full_page" data-cb-type="checkout" data-cb-item-0="diamond-USD-monthly" data-cb-item-1="silver-pass-USD-monthly" data-cb-item-1-quantity="2" >
-          Subscribe
-        </a>
-
+        <h3>Select a state</h3>
     </div>
 
-    
     <script>
         mapboxgl.accessToken = 'pk.eyJ1Ijoic2VyZ2JlciIsImEiOiJja3dwOWgzeGQwYWdyMm9xb2pkMDFvYmNuIn0.H9AJ_NLmDNYMed6dvu_Q0A';
         const map = new mapboxgl.Map({
@@ -114,13 +137,17 @@
                     }
                 })
                 map.getSource("counties").setData(geojson)
+                map.getSource("states").setData(states)
 
                 fillDropDown(states, id => {
-                    console.log('states', states, id);
                     const state = states.features.find(s => s.properties.STATE === id)
+
+                    console.log('states', states, id);
                     console.log('state', state);
+
                     if (state) {
-                        const bbox = turf.bbox(state)
+                        const alaska = [-178.16718682951077, 48.72034947516559, -128.92338050333484, 74.55106351675346]
+                        const bbox = id === "02" ? turf.bbox(turf.bboxPolygon(alaska)) : turf.bbox(state)
                         map.fitBounds(bbox, { padding: 40 })
                     }
                 })
@@ -164,7 +191,21 @@
                 // Place polygons under labels.
                 'settlement-label'
             );
-
+            map.addSource('states', {
+                'type': 'geojson',
+                'data': { type: 'FeatureCollection', features: [] }
+            });
+            //mapbox outline layer
+            map.addLayer({
+                'id': 'outline',
+                'type': 'line',
+                'source': 'states',
+                'layout': {},
+                'paint': {
+                    'line-color': 'white',
+                    'line-width': 2
+                }
+            });
             map.on('click', 'counties', (e) => {
                 map.getCanvas().style.cursor = 'pointer';
                 const feature = e.features[0];
@@ -173,16 +214,19 @@
                 let data = "No data";
                 if (county) {
                     data = `<div>
-                            <div>State:${county.State}</div>
-                            <div>County:${county.County}</div>
-                            <div>Reach:${county.Reach}</div>
-                            <div>${county.URL}</div>
+                            <div><b>${county.County} ${county.State}</b></div>
+                            <div><span class=status"><b>Status:</b> ${county.Status}</span></div>
+                            <div><b>Monthly Lead Flow:</b> ${county.Reach}</div>
+                            <div><b>Price:</b> ${county.Price}</div>
+                            <div><span class="url">${county.URL}</span></div>
                         </div>`
                     overlay.innerHTML = data
                     popup
                         .setLngLat(center.geometry.coordinates)
                         .setHTML(data)
                         .addTo(map);
+
+                    Chargebee.registerAgain();
                 }
                 else {
                     overlay.innerHTML = "No data"
